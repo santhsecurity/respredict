@@ -7,6 +7,7 @@ license = "MIT"
 authors = ["CORUM COLLECTIVE LLC"]
 repository = "https://github.com/santhsecurity/respredict"
 description = "HTTP response prediction from observed traffic for skipping redundant requests."
+readme = "README.md"
 keywords = ["http", "prediction", "response", "scanner", "security"]
 categories = ["network-programming", "web-programming"]
 exclude = ["/target", ".idea", ".vscode", ".DS_Store", "*.swp"]
