@@ -1,0 +1,15 @@
+[package]
+name = "respredict"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+license = "MIT"
+authors = ["CORUM COLLECTIVE LLC"]
+repository = "https://github.com/santhsecurity/respredict"
+description = "HTTP response prediction from observed traffic for skipping redundant requests."
+keywords = ["http", "prediction", "response", "scanner", "security"]
+categories = ["network-programming", "web-programming"]
+exclude = ["/target", ".idea", ".vscode", ".DS_Store", "*.swp"]
+
+[dependencies]
+url = "2"
