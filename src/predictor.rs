@@ -19,7 +19,11 @@ pub fn matches_prediction(
         }
     }
 
-    #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    #[allow(
+        clippy::cast_precision_loss,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss
+    )]
     if let Some(size) = prediction.approximate_size {
         let tolerance_ratio = size_tolerance_ratio.max(0.0);
         let tolerance = ((size as f32) * tolerance_ratio).round() as usize;

@@ -255,7 +255,11 @@ fn classify_segment(segment: &str) -> String {
     if looks_like_uuid(segment) {
         return "{uuid}".to_string();
     }
-    if segment.len() >= 8 && segment.chars().all(|character| character.is_ascii_hexdigit()) {
+    if segment.len() >= 8
+        && segment
+            .chars()
+            .all(|character| character.is_ascii_hexdigit())
+    {
         return "{hex}".to_string();
     }
     segment.to_ascii_lowercase()
@@ -297,14 +301,20 @@ mod tests {
     #[test]
     fn train_records_exact_match_entry() {
         let mut predictor = ResponsePredictor::new();
-        predictor.train(&request("https://example.com/users/1"), &observed(200, Some("application/json"), 64));
+        predictor.train(
+            &request("https://example.com/users/1"),
+            &observed(200, Some("application/json"), 64),
+        );
         assert_eq!(predictor.exact_matches.len(), 1);
     }
 
     #[test]
     fn train_ignores_invalid_urls() {
         let mut predictor = ResponsePredictor::new();
-        predictor.train(&RequestContext::new("not-a-url", "GET"), &observed(200, Some("application/json"), 64));
+        predictor.train(
+            &RequestContext::new("not-a-url", "GET"),
+            &observed(200, Some("application/json"), 64),
+        );
         assert!(predictor.exact_matches.is_empty());
     }
 
@@ -312,39 +322,70 @@ mod tests {
     fn train_batch_records_multiple_samples() {
         let mut predictor = ResponsePredictor::new();
         predictor.train_batch(vec![
-            (request("https://example.com/users/1"), observed(200, Some("application/json"), 64)),
-            (request("https://example.com/users/1"), observed(200, Some("application/json"), 66)),
+            (
+                request("https://example.com/users/1"),
+                observed(200, Some("application/json"), 64),
+            ),
+            (
+                request("https://example.com/users/1"),
+                observed(200, Some("application/json"), 66),
+            ),
         ]);
-        assert_eq!(predictor.predict(&request("https://example.com/users/1")).unwrap().samples, 2);
+        assert_eq!(
+            predictor
+                .predict(&request("https://example.com/users/1"))
+                .unwrap()
+                .samples,
+            2
+        );
     }
 
     #[test]
     fn predict_returns_none_for_empty_training_data() {
         let predictor = ResponsePredictor::new();
-        assert_eq!(predictor.predict(&request("https://example.com/users/1")), None);
+        assert_eq!(
+            predictor.predict(&request("https://example.com/users/1")),
+            None
+        );
     }
 
     #[test]
     fn predict_prefers_exact_match() {
         let mut predictor = ResponsePredictor::new();
-        predictor.train(&request("https://example.com/users/1"), &observed(201, Some("application/json"), 70));
-        predictor.train(&request("https://example.com/users/2"), &observed(404, Some("text/plain"), 10));
-        let prediction = predictor.predict(&request("https://example.com/users/1")).unwrap();
+        predictor.train(
+            &request("https://example.com/users/1"),
+            &observed(201, Some("application/json"), 70),
+        );
+        predictor.train(
+            &request("https://example.com/users/2"),
+            &observed(404, Some("text/plain"), 10),
+        );
+        let prediction = predictor
+            .predict(&request("https://example.com/users/1"))
+            .unwrap();
         assert_eq!(prediction.status, Some(201));
     }
 
     #[test]
     fn predict_falls_back_to_family_match() {
         let mut predictor = ResponsePredictor::new();
-        predictor.train(&request("https://example.com/users/1"), &observed(200, Some("application/json"), 64));
-        let prediction = predictor.predict(&request("https://example.com/users/2")).unwrap();
+        predictor.train(
+            &request("https://example.com/users/1"),
+            &observed(200, Some("application/json"), 64),
+        );
+        let prediction = predictor
+            .predict(&request("https://example.com/users/2"))
+            .unwrap();
         assert_eq!(prediction.status, Some(200));
     }
 
     #[test]
     fn predict_falls_back_to_host_match() {
         let mut predictor = ResponsePredictor::new();
-        predictor.train(&request("https://example.com/users/1"), &observed(202, Some("application/json"), 90));
+        predictor.train(
+            &request("https://example.com/users/1"),
+            &observed(202, Some("application/json"), 90),
+        );
         let other = RequestContext::new("https://example.com/admin", "GET")
             .with_header("Accept", "application/json");
         let prediction = predictor.predict(&other).unwrap();
@@ -354,17 +395,30 @@ mod tests {
     #[test]
     fn predict_tracks_content_type() {
         let mut predictor = ResponsePredictor::new();
-        predictor.train(&request("https://example.com/api"), &observed(200, Some("application/json"), 64));
-        let prediction = predictor.predict(&request("https://example.com/api")).unwrap();
+        predictor.train(
+            &request("https://example.com/api"),
+            &observed(200, Some("application/json"), 64),
+        );
+        let prediction = predictor
+            .predict(&request("https://example.com/api"))
+            .unwrap();
         assert_eq!(prediction.content_type.as_deref(), Some("application/json"));
     }
 
     #[test]
     fn predict_tracks_average_size() {
         let mut predictor = ResponsePredictor::new();
-        predictor.train(&request("https://example.com/api"), &observed(200, Some("application/json"), 50));
-        predictor.train(&request("https://example.com/api"), &observed(200, Some("application/json"), 70));
-        let prediction = predictor.predict(&request("https://example.com/api")).unwrap();
+        predictor.train(
+            &request("https://example.com/api"),
+            &observed(200, Some("application/json"), 50),
+        );
+        predictor.train(
+            &request("https://example.com/api"),
+            &observed(200, Some("application/json"), 70),
+        );
+        let prediction = predictor
+            .predict(&request("https://example.com/api"))
+            .unwrap();
         assert_eq!(prediction.approximate_size, Some(60));
     }
 
@@ -382,18 +436,36 @@ mod tests {
     #[test]
     fn should_skip_requires_sufficient_samples_and_confidence() {
         let mut predictor = ResponsePredictor::new();
-        predictor.train(&request("https://example.com/api"), &observed(200, Some("application/json"), 50));
-        predictor.train(&request("https://example.com/api"), &observed(200, Some("application/json"), 52));
-        predictor.train(&request("https://example.com/api"), &observed(200, Some("application/json"), 54));
+        predictor.train(
+            &request("https://example.com/api"),
+            &observed(200, Some("application/json"), 50),
+        );
+        predictor.train(
+            &request("https://example.com/api"),
+            &observed(200, Some("application/json"), 52),
+        );
+        predictor.train(
+            &request("https://example.com/api"),
+            &observed(200, Some("application/json"), 54),
+        );
         assert!(predictor.should_skip(&request("https://example.com/api"), &SkipPolicy::default()));
     }
 
     #[test]
     fn should_skip_rejects_high_size_spread() {
         let mut predictor = ResponsePredictor::new();
-        predictor.train(&request("https://example.com/api"), &observed(200, Some("application/json"), 10));
-        predictor.train(&request("https://example.com/api"), &observed(200, Some("application/json"), 100));
-        predictor.train(&request("https://example.com/api"), &observed(200, Some("application/json"), 200));
+        predictor.train(
+            &request("https://example.com/api"),
+            &observed(200, Some("application/json"), 10),
+        );
+        predictor.train(
+            &request("https://example.com/api"),
+            &observed(200, Some("application/json"), 100),
+        );
+        predictor.train(
+            &request("https://example.com/api"),
+            &observed(200, Some("application/json"), 200),
+        );
         assert!(!predictor.should_skip(&request("https://example.com/api"), &SkipPolicy::default()));
     }
 
@@ -405,7 +477,8 @@ mod tests {
 
     #[test]
     fn normalized_family_path_rewrites_uuid_segments() {
-        let url = Url::parse("https://example.com/users/550e8400-e29b-41d4-a716-446655440000").unwrap();
+        let url =
+            Url::parse("https://example.com/users/550e8400-e29b-41d4-a716-446655440000").unwrap();
         assert_eq!(normalized_family_path(&url), "/users/{uuid}");
     }
 

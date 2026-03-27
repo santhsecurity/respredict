@@ -1,6 +1,5 @@
 use respredict::{
-    matches_prediction, ObservedResponse, Prediction, RequestContext, ResponsePredictor,
-    SkipPolicy,
+    matches_prediction, ObservedResponse, Prediction, RequestContext, ResponsePredictor, SkipPolicy,
 };
 use std::sync::Arc;
 use std::thread;
@@ -9,7 +8,10 @@ use std::thread;
 fn empty_and_invalid_inputs_fail_cleanly() {
     let predictor = ResponsePredictor::new();
     assert!(predictor.predict(&RequestContext::new("", "")).is_none());
-    assert!(!predictor.should_skip(&RequestContext::new("not-a-url", "GET"), &SkipPolicy::default()));
+    assert!(!predictor.should_skip(
+        &RequestContext::new("not-a-url", "GET"),
+        &SkipPolicy::default()
+    ));
 }
 
 #[test]
@@ -22,15 +24,17 @@ fn null_bytes_and_unicode_urls_are_rejected_without_panicking() {
 #[test]
 fn extremely_long_urls_and_headers_are_handled() {
     let mut predictor = ResponsePredictor::new();
-    let request = RequestContext::new(
-        format!("https://example.com/{}", "a".repeat(16_384)),
-        "GET",
-    )
-    .with_header("Accept", "text/html")
-    .with_header("X-Long", "b".repeat(16_384));
+    let request = RequestContext::new(format!("https://example.com/{}", "a".repeat(16_384)), "GET")
+        .with_header("Accept", "text/html")
+        .with_header("X-Long", "b".repeat(16_384));
 
-    predictor.train(&request, &ObservedResponse::new(200, Some("text/html"), usize::MAX));
-    let prediction = predictor.predict(&request).expect("prediction should exist");
+    predictor.train(
+        &request,
+        &ObservedResponse::new(200, Some("text/html"), usize::MAX),
+    );
+    let prediction = predictor
+        .predict(&request)
+        .expect("prediction should exist");
     assert_eq!(prediction.status, Some(200));
     assert_eq!(prediction.approximate_size, Some(usize::MAX));
 }
@@ -42,7 +46,9 @@ fn malformed_training_data_is_ignored_not_panicked() {
         &RequestContext::new("this is not a url", "POST"),
         &ObservedResponse::new(0, None, 0),
     );
-    assert!(predictor.predict(&RequestContext::new("https://example.com/test", "POST")).is_none());
+    assert!(predictor
+        .predict(&RequestContext::new("https://example.com/test", "POST"))
+        .is_none());
 }
 
 #[test]
@@ -91,7 +97,9 @@ fn every_public_function_handles_bad_input_gracefully() {
         ObservedResponse::new(999, Some("☃️/weird"), 0),
     )]);
 
-    assert!(predictor.predict(&RequestContext::new("notaurl", "TRACE")).is_none());
+    assert!(predictor
+        .predict(&RequestContext::new("notaurl", "TRACE"))
+        .is_none());
     assert!(!predictor.should_skip(
         &RequestContext::new("", ""),
         &SkipPolicy {
@@ -108,9 +116,13 @@ fn concurrent_prediction_reads_are_safe() {
     assert_send_sync::<ResponsePredictor>();
 
     let mut predictor = ResponsePredictor::new();
-    let request = RequestContext::new("https://example.com/data", "GET").with_header("Accept", "application/json");
+    let request = RequestContext::new("https://example.com/data", "GET")
+        .with_header("Accept", "application/json");
     for _ in 0..4 {
-        predictor.train(&request, &ObservedResponse::new(200, Some("application/json"), 128));
+        predictor.train(
+            &request,
+            &ObservedResponse::new(200, Some("application/json"), 128),
+        );
     }
 
     let predictor = Arc::new(predictor);
@@ -119,7 +131,9 @@ fn concurrent_prediction_reads_are_safe() {
             let predictor = Arc::clone(&predictor);
             let request = request.clone();
             thread::spawn(move || {
-                let prediction = predictor.predict(&request).expect("prediction should exist");
+                let prediction = predictor
+                    .predict(&request)
+                    .expect("prediction should exist");
                 assert_eq!(prediction.status, Some(200));
             })
         })
