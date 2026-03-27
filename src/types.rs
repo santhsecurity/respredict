@@ -4,6 +4,23 @@ use std::collections::BTreeMap;
 pub type HeaderMap = BTreeMap<String, String>;
 
 /// A minimal request context used for predictions.
+///
+/// This struct captures the essential information about an HTTP request
+/// that is needed for training the prediction model and making predictions.
+///
+/// # Examples
+///
+/// ```
+/// use respredict::RequestContext;
+///
+/// let request = RequestContext::new("https://api.example.com/users/1", "GET")
+///     .with_header("Accept", "application/json")
+///     .with_header("Authorization", "Bearer token123");
+///
+/// assert_eq!(request.url, "https://api.example.com/users/1");
+/// assert_eq!(request.method, "GET");
+/// assert_eq!(request.headers.get("Accept"), Some(&"application/json".to_string()));
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RequestContext {
     /// The target URL.
@@ -16,6 +33,26 @@ pub struct RequestContext {
 
 impl RequestContext {
     /// Create a new request context.
+    ///
+    /// The HTTP method will be normalized to uppercase.
+    ///
+    /// # Arguments
+    ///
+    /// * `url` - The target URL for the request.
+    /// * `method` - The HTTP method (e.g., "GET", "POST").
+    ///
+    /// # Returns
+    ///
+    /// A new `RequestContext` with empty headers.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use respredict::RequestContext;
+    ///
+    /// let request = RequestContext::new("https://example.com/api", "post");
+    /// assert_eq!(request.method, "POST"); // Normalized to uppercase
+    /// ```
     #[must_use]
     pub fn new(url: impl Into<String>, method: impl Into<String>) -> Self {
         Self {
@@ -26,6 +63,29 @@ impl RequestContext {
     }
 
     /// Add a header to the request context fluently.
+    ///
+    /// This method returns `self` to allow chaining multiple headers.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - The header name.
+    /// * `value` - The header value.
+    ///
+    /// # Returns
+    ///
+    /// The modified `RequestContext` for method chaining.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use respredict::RequestContext;
+    ///
+    /// let request = RequestContext::new("https://example.com", "GET")
+    ///     .with_header("Accept", "application/json")
+    ///     .with_header("Content-Type", "application/json");
+    ///
+    /// assert_eq!(request.headers.len(), 2);
+    /// ```
     #[must_use]
     pub fn with_header(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
         self.headers.insert(key.into(), value.into());
@@ -34,6 +94,21 @@ impl RequestContext {
 }
 
 /// The observed ground-truth response for a request.
+///
+/// This struct represents the actual response received from a server,
+/// used to train and evaluate the prediction model.
+///
+/// # Examples
+///
+/// ```
+/// use respredict::ObservedResponse;
+///
+/// let response = ObservedResponse::new(200, Some("application/json"), 1024);
+///
+/// assert_eq!(response.status, 200);
+/// assert_eq!(response.content_type, Some("application/json".to_string()));
+/// assert_eq!(response.approximate_size, 1024);
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ObservedResponse {
     /// The HTTP status code.
@@ -46,6 +121,28 @@ pub struct ObservedResponse {
 
 impl ObservedResponse {
     /// Create a new observed response.
+    ///
+    /// # Arguments
+    ///
+    /// * `status` - The HTTP status code (e.g., 200, 404).
+    /// * `content_type` - Optional MIME type of the response body.
+    /// * `approximate_size` - Approximate size of the response body in bytes.
+    ///
+    /// # Returns
+    ///
+    /// A new `ObservedResponse` with the specified fields.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use respredict::ObservedResponse;
+    ///
+    /// // With content type
+    /// let response = ObservedResponse::new(200, Some("text/html"), 512);
+    ///
+    /// // Without content type (e.g., 204 No Content)
+    /// let empty_response = ObservedResponse::new(204, None, 0);
+    /// ```
     #[must_use]
     pub fn new(status: u16, content_type: Option<&str>, approximate_size: usize) -> Self {
         Self {
@@ -57,6 +154,26 @@ impl ObservedResponse {
 }
 
 /// A statistical prediction for a response.
+///
+/// This struct contains the predicted characteristics of an HTTP response,
+/// along with confidence metrics based on historical observations.
+///
+/// # Examples
+///
+/// ```
+/// use respredict::Prediction;
+///
+/// let prediction = Prediction {
+///     status: Some(200),
+///     content_type: Some("application/json".to_string()),
+///     approximate_size: Some(256),
+///     confidence: 0.95,
+///     samples: 10,
+/// };
+///
+/// assert!(prediction.confidence > 0.9);
+/// assert_eq!(prediction.samples, 10);
+/// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct Prediction {
     /// The predicted status code.
@@ -65,13 +182,38 @@ pub struct Prediction {
     pub content_type: Option<String>,
     /// The predicted approximate size.
     pub approximate_size: Option<usize>,
-    /// How confident the model evaluates this prediction.
+    /// How confident the model evaluates this prediction (0.0 to 1.0).
     pub confidence: f32,
     /// How many samples were observed for this shape.
     pub samples: usize,
 }
 
 /// A policy governing when to skip a request based on confidence.
+///
+/// The `SkipPolicy` defines the thresholds that must be met before
+/// the predictor will recommend skipping a request.
+///
+/// # Default Values
+///
+/// * `min_confidence`: 0.85 (85% confidence required)
+/// * `min_samples`: 3 (at least 3 observations needed)
+/// * `max_size_spread_ratio`: 0.20 (size variance must be within 20%)
+///
+/// # Examples
+///
+/// ```
+/// use respredict::SkipPolicy;
+///
+/// // Use default policy
+/// let policy = SkipPolicy::default();
+///
+/// // Create a custom policy
+/// let strict_policy = SkipPolicy {
+///     min_confidence: 0.95,
+///     min_samples: 5,
+///     max_size_spread_ratio: 0.10,
+/// };
+/// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct SkipPolicy {
     /// Minimum confidence threshold (0.0 to 1.0).
@@ -83,6 +225,13 @@ pub struct SkipPolicy {
 }
 
 impl Default for SkipPolicy {
+    /// Returns the default skip policy.
+    ///
+    /// # Default Values
+    ///
+    /// * `min_confidence`: 0.85
+    /// * `min_samples`: 3
+    /// * `max_size_spread_ratio`: 0.20
     fn default() -> Self {
         Self {
             min_confidence: 0.85,
